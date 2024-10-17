@@ -1,2 +1,15 @@
 # FatigueDetection
+
 A uni project/Proof of concept
+This is a also a space to document the progress i've made on the project and learning Github at the same time
+
+# Fatigue detection 
+current model is based on https://github.com/raja434/driver-fatigue-detection-system where i used his code as foundation
+to build upon. The current model detects drowsiness using Eye aspect ratio calculation (EAR) in real-time using a webcam feed.
+If the EAR ration went below the thresh hold (0.3) it will play a alarm sound dispaly an warning message as well.
+
+# Modification history 
+* removed the alarm sound
+* removed dlib's facial detect
+* added face_recognition package from dlib due to requiring addtional file ("68 face landmarks.dat")
+* 
