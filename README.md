@@ -8,8 +8,14 @@ current model is based on https://github.com/raja434/driver-fatigue-detection-sy
 to build upon. The current model detects drowsiness using Eye aspect ratio calculation (EAR) in real-time using a webcam feed.
 If the EAR ration went below the thresh hold (0.3) it will play a alarm sound dispaly an warning message as well.
 
+# Funtions/ideas to be addded 
+1. yawning detection 
+
+
 # Modification history 
 * removed the alarm sound
 * removed dlib's facial detect
 * added face_recognition package from dlib due to requiring addtional file ("68 face landmarks.dat")
+* added Mouth Aspect Ratio(MAR) which works the same as EAR
+* fixed camera not closing even after "q" key is pressed
 * 
