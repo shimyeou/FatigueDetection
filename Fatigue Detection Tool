@@ -1,0 +1,225 @@
+!pip install mediapipe
+!pip install imutils
+!pip install opencv-python
+!pip install pandas
+!pip install seaborn
+
+import cv2
+import pandas as pd
+import mediapipe as mp
+import numpy as np
+from deepface import DeepFace
+import os
+import time
+from scipy.spatial import distance as dist
+from imutils.video import VideoStream
+import matplotlib.pyplot as plt
+import seaborn as sns
+from datetime import datetime
+
+# Initialize MediaPipe Face Mesh
+mp_face_mesh = mp.solutions.face_mesh
+face_mesh = mp_face_mesh.FaceMesh(min_detection_confidence=0.5, min_tracking_confidence=0.5)
+
+# Constants
+EYE_AR_THRESH = 0.3            # Adjust the eye closed state to trigger the alert 
+EYE_AR_CONSEC_FRAMES = 15      # Adjust amount of eye closed frames to trigger alert
+MAR_THRESH = 0.09              # Adjust the mouth opened state to trigger the alert 
+MAR_CONSEC_FRAMES = 15         # Adjust amount of mouth opened frames to trigger alert
+FRAME_SKIP = 2
+DEEPFACE_CHECK_INTERVAL = 300  # every 300 frames (~10 seconds at 30fps)
+
+# Counters and flags
+frame_count = 0
+COUNTER = 0
+MAR_COUNTER = 0
+ALARM_ON = False
+yawn_alarm_on = False
+
+# Log counters and timestamps
+drowsiness_log = []
+yawning_log = []
+current_name = "Unknown"
+
+# EAR Calculation
+def eye_aspect_ratio(eye):
+    A = dist.euclidean(eye[1], eye[5])
+    B = dist.euclidean(eye[2], eye[4])
+    C = dist.euclidean(eye[0], eye[3])
+    ear = (A + B) / (2.0 * C)
+    return ear
+
+# MAR Calculation
+def mouth_aspect_ratio(mouth):
+    A = dist.euclidean(mouth[0], mouth[1])
+    return A
+
+# Start video stream
+vs = VideoStream(src=0).start()
+time.sleep(1.0)
+
+while True:
+    frame = vs.read()
+    frame_count += 1
+    if frame_count % FRAME_SKIP != 0:
+        continue
+
+    frame = cv2.flip(frame, 1)
+    frame = cv2.resize(frame, (720, 480))
+    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+    # Face recognition using DeepFace every 300 frames
+    if frame_count % DEEPFACE_CHECK_INTERVAL == 0:
+        try:
+            bgr_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            result = DeepFace.find(
+                img_path=bgr_frame,
+                db_path="known_faces",
+                model_name="Facenet",
+                distance_metric="cosine",
+                enforce_detection=False,
+                silent=True,
+                threshold=0.6
+            )
+
+            if len(result) > 0 and len(result[0]) > 0:
+                identity = os.path.basename(result[0].iloc[0]['identity'])
+                current_name = os.path.splitext(identity)[0]
+                # Match found (silent)
+            else:
+                current_name = "Unknown"
+                # No match found (silent)
+
+        except Exception:
+            current_name = "Unknown"
+            # Face recognition failed (silent)
+
+    # MediaPipe facial landmarks
+    results = face_mesh.process(rgb_frame)
+
+    if results.multi_face_landmarks:
+        for face_landmarks in results.multi_face_landmarks:
+            landmarks = face_landmarks.landmark
+
+            left_eye_idx = [33, 160, 158, 133, 153, 144]
+            right_eye_idx = [263, 387, 385, 362, 380, 373]
+            mouth_idx = [13, 14]
+
+            leftEye = np.array([(landmarks[i].x, landmarks[i].y) for i in left_eye_idx])
+            rightEye = np.array([(landmarks[i].x, landmarks[i].y) for i in right_eye_idx])
+            mouth = np.array([(landmarks[i].x, landmarks[i].y) for i in mouth_idx])
+
+            leftEAR = eye_aspect_ratio(leftEye)
+            rightEAR = eye_aspect_ratio(rightEye)
+            ear = (leftEAR + rightEAR) / 2.0
+            mar = mouth_aspect_ratio(mouth)
+
+            warning_text_1 = ""
+            warning_text_2 = ""
+
+            if ear < EYE_AR_THRESH:
+                COUNTER += 1
+                if COUNTER == EYE_AR_CONSEC_FRAMES:
+                    ALARM_ON = True
+                    drowsiness_log.append((time.strftime("%Y-%m-%d %H:%M:%S"), current_name))
+                    warning_text_1 = "DROWSINESS ALERT!"
+                elif COUNTER > EYE_AR_CONSEC_FRAMES:
+                    warning_text_1 = "DROWSINESS ALERT!"
+            else:
+                COUNTER = 0
+                ALARM_ON = False
+
+            if mar > MAR_THRESH:
+                MAR_COUNTER += 1
+                if MAR_COUNTER == MAR_CONSEC_FRAMES:
+                    yawn_alarm_on = True
+                    yawning_log.append((time.strftime("%Y-%m-%d %H:%M:%S"), current_name))
+                    warning_text_2 = "YAWNING DETECTED!"
+                elif MAR_COUNTER > MAR_CONSEC_FRAMES:
+                    warning_text_2 = "YAWNING DETECTED!"
+            else:
+                MAR_COUNTER = 0
+                yawn_alarm_on = False
+
+            if warning_text_1:
+                cv2.putText(frame, warning_text_1, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+            if warning_text_2:
+                cv2.putText(frame, warning_text_2, (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+
+            cv2.putText(frame, f"EAR: {ear:.2f}", (600, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            cv2.putText(frame, f"MAR: {mar:.2f}", (600, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+
+    # Show current recognized name with color based on match status
+    name_color = (0, 255, 0) if current_name != "Unknown" else (0, 0, 255)
+    cv2.putText(frame, current_name, (300, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, name_color, 2)
+
+    cv2.imshow("Fatigue Detection", frame)
+    if cv2.waitKey(5) & 0xFF == ord("q"):
+        break
+
+# Create and save report
+
+# Generate timestamp string
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+save_dir = "C:/Users/yeou1/Fatigue_project/Reports"
+os.makedirs(save_dir, exist_ok=True)
+
+log_filename = os.path.join(save_dir, f"fatigue_log_{timestamp}.xlsx")
+dashboard_filename = os.path.join(save_dir, f"fatigue_dashboard_{timestamp}.xlsx")
+fatigue_plot_path = os.path.join(save_dir, "fatigue_plot.png")
+fatigue_time_plot_path = os.path.join(save_dir, "fatigue_time_plot.png")
+
+
+data = {
+    "timestamp": [ts for ts, _ in drowsiness_log + yawning_log],
+    "person": [name for _, name in drowsiness_log + yawning_log],
+    "event": ["Drowsiness Alert"] * len(drowsiness_log) + ["Yawning Alert"] * len(yawning_log)
+}
+df = pd.DataFrame(data)
+
+df.to_excel(log_filename, index=False)
+
+# Create and save plot
+counts = df['event'].value_counts()
+plt.figure(figsize=(6, 4))
+sns.barplot(x=counts.index, y=counts.values, hue=counts.index, palette="pastel", legend=False)
+plt.title('Fatigue Event Counts')
+plt.ylabel('Count')
+plt.xlabel('Event Type')
+plt.tight_layout()
+plt.savefig(fatigue_plot_path) 
+plt.close()
+
+# Plotting
+# Convert timestamp column to datetime if not already
+df['timestamp'] = pd.to_datetime(df['timestamp'])
+
+# Round timestamps to the nearest minute for grouping (or use .dt.floor('10s') for 10-sec bins)
+df['minute'] = df['timestamp'].dt.floor('T')
+
+# Group by time and event
+time_counts = df.groupby(['minute', 'event']).size().reset_index(name='count')
+
+# Create bar plot
+plt.figure(figsize=(10, 5))
+sns.barplot(data=time_counts, x='minute', y='count', hue='event', palette="Set2")
+plt.xticks(rotation=45)
+plt.title('Fatigue Events Over Time')
+plt.ylabel('Event Count')
+plt.xlabel('Time')
+plt.tight_layout()
+plt.savefig(fatigue_time_plot_path) 
+plt.close()
+
+# Save Excel dashboard with embedded plot
+with pd.ExcelWriter(dashboard_filename, engine='xlsxwriter') as writer:
+    df.to_excel(writer, sheet_name='Data', index=False)
+    workbook = writer.book
+    worksheet = workbook.add_worksheet('Dashboard')
+    worksheet.insert_image('B2', fatigue_plot_path)
+    worksheet.insert_image('B22', fatigue_time_plot_path)
+
+vs.stream.release()
+vs.stop()
+cv2.destroyAllWindows()
