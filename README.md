@@ -9,7 +9,9 @@ to build upon. The current model detects drowsiness using Eye aspect ratio calcu
 If the EAR ration went below the thresh hold (0.3) it will play a alarm sound dispaly an warning message as well.
 
 # Funtions/ideas to be addded 
-1. yawning detection 
+1. yawning detection
+2. logging events
+3. produce visuals
 
 
 # Modification history 
@@ -18,4 +20,10 @@ If the EAR ration went below the thresh hold (0.3) it will play a alarm sound di
 * added face_recognition package from dlib due to requiring addtional file ("68 face landmarks.dat")
 * added Mouth Aspect Ratio(MAR) which works the same as EAR
 * fixed camera not closing even after "q" key is pressed
-* 
+* alerts can now be displayed simultaneously
+* added face_boundd to scale with the face
+* added frame skip to reduce fps
+* switched out face_recognition to MediaPipe 
+* added logging function
+* added visuals function
+  
