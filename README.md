@@ -1,12 +1,19 @@
-# FatigueDetection
+# Background
 
-A uni project/Proof of concept
-This is a also a space to document the progress i've made on the project and learning Github at the same time
+Babcock is a global defence and engineering company that provides critical services to civil and military
+sectors, including a range of maritime sustainment services. Worker fatigue within these fast-paced
+environments poses a significant risk in decision making capability, and resultant worker safety. While
+training exists, there’s no effective way to monitor fatigue in real time. This project proposes a
+proof-of-concept tool using computer vision and machine learning to address this gap.
 
-# Fatigue detection 
-current model is based on https://github.com/raja434/driver-fatigue-detection-system where i used his code as foundation
-to build upon. The current model detects drowsiness using Eye aspect ratio calculation (EAR) in real-time using a webcam feed.
-If the EAR ration went below the thresh hold (0.3) it will play a alarm sound dispaly an warning message as well.
+# Problem
+Workplace fatigue poses a safety, productivity and operational
+risk for workers within a maritime maintenance environment.
+Although training is provided, there is no reliable way to monitor
+fatigue in real time. This project develops a proof-of-concept tool
+using computer vision and machine learning to detect early
+signs of fatigue at fixed workstations, aiming to enhance safety,
+reduce errors, and support proactive wellbeing measures.
 
 # Funtions/ideas to be addded 
 1. yawning detection
